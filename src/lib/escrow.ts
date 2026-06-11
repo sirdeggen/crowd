@@ -10,7 +10,6 @@ import {
   Random,
   Hash,
   P2PKH,
-  ARC,
 } from '@bsv/sdk'
 import type { InviteMsg, ProposalMsg } from './protocol'
 import { MULTISIG_PROTOCOL, BRC29_PROTOCOL } from './protocol'
@@ -39,6 +38,21 @@ export interface BuildProposalParams {
 // ---------------------------------------------------------------------------
 // Pure helpers — no wallet required
 // ---------------------------------------------------------------------------
+
+/** Network fee rate for proposal transactions. */
+export const FEE_PER_KB = 100
+
+/**
+ * Pure: fee for a proposal spend at FEE_PER_KB, from the estimated final size
+ * (base tx + multisig unlocking script + one P2PKH output).
+ */
+export function estimateProposalFee (invite: InviteMsg): number {
+  const txSizeEstimate =
+    10 + 40 +
+    CrowdEscrow.estimateMultisigUnlockLength(invite.threshold, invite.pubkeys.length) +
+    34
+  return Math.max(1, Math.ceil((txSizeEstimate / 1000) * FEE_PER_KB))
+}
 
 /**
  * Reconstruct the proposal Transaction with sourceTransaction attached. Pure.
@@ -217,12 +231,7 @@ export async function buildProposal (p: BuildProposalParams): Promise<ProposalMs
   const fundingTx = Transaction.fromAtomicBEEF(Utils.toArray(invite.beef, 'hex'))
   const vout = Number(invite.escrowId.split('.')[1])
 
-  // Estimate fee
-  const txSizeEstimate =
-    10 + 40 +
-    CrowdEscrow.estimateMultisigUnlockLength(invite.threshold, invite.pubkeys.length) +
-    34
-  const fee = Math.max(2, Math.ceil(txSizeEstimate / 1000))
+  const fee = estimateProposalFee(invite)
   const outputSatoshis = invite.satoshis - fee
 
   // Build the proposal tx
@@ -330,13 +339,33 @@ export async function finalizeProposal (
   const pubKeyObjects = invite.pubkeys.map(p => PublicKey.fromString(p))
   const unlockScript = CrowdEscrow.unlockMultisig(orderedSigs, pubKeyObjects)
 
+  // Broadcast through the wallet. The wallet rebuilds the transaction from
+  // these args; with the same input (sequence 0xffffffff), the same outputs in
+  // order, version 1 and lockTime 0 it is byte-identical to the proposal tx
+  // everyone signed, so the collected signatures stay valid. Any structural
+  // mismatch fails script validation rather than broadcasting a bad spend.
   const tx = proposalTx(invite, ps.proposal)
-  tx.inputs[0].unlockingScript = unlockScript
+  const result = await wallet.createAction({
+    description: 'Finalize crowd escrow transfer',
+    inputBEEF: Utils.toArray(invite.beef, 'hex'),
+    inputs: [
+      {
+        outpoint: invite.escrowId,
+        inputDescription: 'Escrow multisig spend',
+        unlockingScript: unlockScript.toHex(),
+        sequenceNumber: 0xffffffff,
+      },
+    ],
+    outputs: tx.outputs.map((o, i) => ({
+      lockingScript: (o.lockingScript as LockingScript).toHex(),
+      satoshis: o.satoshis ?? 0,
+      outputDescription: `Escrow transfer output ${i}`,
+    })),
+    options: { randomizeOutputs: false, acceptDelayedBroadcast: false },
+  })
 
-  const result = await tx.broadcast(new ARC('https://arc.taal.com'))
-  if (result.status === 'error') {
-    throw new Error(result.description)
-  }
+  if (result.txid !== undefined) return result.txid
+  if (result.tx != null) return Transaction.fromAtomicBEEF(result.tx).id('hex')
   return tx.id('hex')
 }
 
