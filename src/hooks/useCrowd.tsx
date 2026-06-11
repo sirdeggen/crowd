@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { applyAndSave, emptyState, loadState, type CrowdState } from '../lib/store'
+import { applyAndSave, emptyState, loadState, removeCancelledAndSave, type CrowdState } from '../lib/store'
 import { type CrowdMessage } from '../lib/protocol'
 import { getOwnIdentityKey } from '../lib/wallet'
 import { drainInbox, listenLive } from '../lib/messages'
@@ -18,6 +18,7 @@ interface CrowdContextValue {
   state: CrowdState
   mbxError?: string
   dispatchMessages: (msgs: CrowdMessage[]) => void
+  removeCancelledEscrows: () => void
   refresh: () => Promise<void>
 }
 
@@ -123,6 +124,10 @@ export function CrowdProvider ({ children }: { children: ReactNode }) {
     setState(s => applyAndSave(ownKeyRef.current, s, msgs))
   }, [])
 
+  const removeCancelledEscrowsFn = useCallback(() => {
+    setState(s => removeCancelledAndSave(ownKeyRef.current, s))
+  }, [])
+
   const refresh = useCallback(async () => {
     try {
       const msgs = await drainInbox()
@@ -139,6 +144,7 @@ export function CrowdProvider ({ children }: { children: ReactNode }) {
     state,
     mbxError,
     dispatchMessages,
+    removeCancelledEscrows: removeCancelledEscrowsFn,
     refresh,
   }
 

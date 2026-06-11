@@ -6,6 +6,8 @@ import { SigRing } from './SigRing'
 interface Props {
   id: string
   es: EscrowState
+  /** Highlight on the dashboard active section */
+  featured?: boolean
 }
 
 function statusPillClass (status: EscrowState['status']): string {
@@ -16,7 +18,7 @@ function statusPillClass (status: EscrowState['status']): string {
   }
 }
 
-export function EscrowCard ({ id, es }: Props) {
+export function EscrowCard ({ id, es, featured = false }: Props) {
   const { invite, status, proposals } = es
   const controllers = invite.controllers
   const threshold = invite.threshold
@@ -32,7 +34,7 @@ export function EscrowCard ({ id, es }: Props) {
   return (
     <Link
       to={`/e/${id}`}
-      className="panel escrow-card"
+      className={`panel escrow-card${featured ? ' escrow-card--featured' : ''}${status !== 'active' ? ' escrow-card--archived' : ''}`}
       style={{ display: 'block' }}
     >
       {/* Header row: name + status pill */}
@@ -54,14 +56,13 @@ export function EscrowCard ({ id, es }: Props) {
         <SigRing count={maxSigs} threshold={threshold} size={56} />
       </div>
 
-      {/* Avatar stack */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap' }}>
         {controllers.slice(0, 5).map((key, idx) => (
           <span
             key={key}
-            style={{ marginLeft: idx === 0 ? 0 : -8, zIndex: controllers.length - idx, position: 'relative' }}
+            style={{ marginLeft: idx === 0 ? 0 : -10, zIndex: controllers.length - idx, position: 'relative' }}
           >
-            <AvatarChip identityKey={key} size={28} showName={false} />
+            <AvatarChip identityKey={key} size={30} showName={false} stacked />
           </span>
         ))}
         {controllers.length > 5 && (

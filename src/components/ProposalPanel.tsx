@@ -183,28 +183,31 @@ export function ProposalPanel ({ invite, es, ps, highlighted = false }: Props) {
         <OutputList proposal={proposal} invite={invite} />
       </div>
 
-      {/* Controller status rows */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+      <span className="section-label">Controller responses</span>
+      <div className="controller-status-list" style={{ marginBottom: 16 }}>
         {invite.controllers.map(ctrl => {
           const verified = verifiedMap[ctrl] === true
           const vetoReasonVal = ps.vetoes[ctrl]
 
           let statusNode: React.ReactNode
+          let rowClass = 'controller-status-row'
           if (verified) {
-            statusNode = <span style={{ fontSize: 12, color: 'var(--ok)' }}>✓ signed</span>
+            statusNode = <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ok)' }}>Signed</span>
+            rowClass += ' controller-status-row--signed'
           } else if (vetoReasonVal != null) {
             statusNode = (
-              <span style={{ fontSize: 12, color: 'var(--danger)' }}>
-                ✗ vetoed{vetoReasonVal !== '' ? `: ${vetoReasonVal}` : ''}
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--danger)' }}>
+                Vetoed{vetoReasonVal !== '' ? ` · ${vetoReasonVal}` : ''}
               </span>
             )
+            rowClass += ' controller-status-row--vetoed'
           } else {
-            statusNode = <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>awaiting</span>
+            statusNode = <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Awaiting</span>
           }
 
           return (
-            <div key={ctrl} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-              <AvatarChip identityKey={ctrl} size={24} showName={false} />
+            <div key={ctrl} className={rowClass}>
+              <AvatarChip identityKey={ctrl} size={26} showName suffix={ctrl === ownKey ? '(you)' : undefined} embedded />
               {statusNode}
             </div>
           )

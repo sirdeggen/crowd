@@ -149,21 +149,22 @@ export function EscrowDetail () {
               </div>
             )}
 
-            {/* N-of-M rule */}
-            <p style={{ margin: '0 0 10px', fontSize: 14, color: 'var(--text-dim)' }}>
+            <p style={{ margin: '0 0 14px', fontSize: 14, color: 'var(--text-dim)' }}>
               Requires{' '}
               <strong style={{ color: 'var(--text)' }}>{invite.threshold} of {invite.controllers.length}</strong>{' '}
               controllers to sign
             </p>
 
-            {/* Controller avatar row */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+            <span className="section-label">Controllers</span>
+            <div className="controller-grid">
               {invite.controllers.map(ctrl => (
                 <AvatarChip
                   key={ctrl}
                   identityKey={ctrl}
-                  size={28}
+                  size={30}
                   showName
+                  suffix={ctrl === ownKey ? '(you)' : undefined}
+                  showKey
                 />
               ))}
             </div>

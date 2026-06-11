@@ -150,12 +150,12 @@ export function ProposeForm ({ invite, defaultOpen = false }: Props) {
             {mode === 'identity' ? (
               <div>
                 {selectedIdentity.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 12px', background: 'var(--bg-raise)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--panel-border)' }}>
-                    <AvatarChip identityKey={selectedIdentity[0].identityKey} size={24} showName />
+                  <div className="identity-chip identity-chip--actionable" style={{ marginBottom: 8 }}>
+                    <AvatarChip identityKey={selectedIdentity[0].identityKey} size={28} showName showKey embedded />
                     <button
                       type="button"
+                      className="identity-chip__remove"
                       onClick={() => setSelectedIdentity([])}
-                      style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}
                       aria-label="Clear recipient"
                     >
                       ×

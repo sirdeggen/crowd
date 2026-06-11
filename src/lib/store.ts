@@ -183,3 +183,18 @@ export function applyAndSave (ownKey: string, s: CrowdState, msgs: CrowdMessage[
   saveState(ownKey, next)
   return next
 }
+
+/** Remove all escrows with status `cancelled` from local state. */
+export function removeCancelledEscrows (state: CrowdState): CrowdState {
+  const escrows = Object.fromEntries(
+    Object.entries(state.escrows).filter(([, es]) => es.status !== 'cancelled'),
+  )
+  if (Object.keys(escrows).length === Object.keys(state.escrows).length) return state
+  return { ...state, escrows }
+}
+
+export function removeCancelledAndSave (ownKey: string, state: CrowdState): CrowdState {
+  const next = removeCancelledEscrows(state)
+  saveState(ownKey, next)
+  return next
+}

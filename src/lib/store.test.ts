@@ -5,6 +5,8 @@ import {
   loadState,
   saveState,
   applyAndSave,
+  removeCancelledEscrows,
+  removeCancelledAndSave,
   type EscrowState,
 } from './store'
 import type { InviteMsg, ProposalMsg, SignatureMsg, VetoMsg, FinalizedMsg, CancelledMsg } from './protocol'
@@ -360,6 +362,56 @@ describe('applyAndSave', () => {
     const s1 = reduce(emptyState, makeInvite())
     const result = applyAndSave(OWN_KEY, s1, [])
     expect(result).toEqual(s1)
+  })
+})
+
+describe('removeCancelledEscrows', () => {
+  it('removes only cancelled escrows', () => {
+    const s1 = reduce(emptyState, makeInvite({ escrowId: 'active.0' }))
+    const s2 = reduce(s1, makeInvite({ escrowId: 'spent.0' }))
+    const s3 = reduce(s2, makeProposal({ escrowId: 'spent.0', proposalId: 'prop-spent' }))
+    const s4 = reduce(s3, makeFinalized({ escrowId: 'spent.0', proposalId: 'prop-spent' }))
+    const s5 = reduce(s4, makeInvite({ escrowId: 'cancelled.0' }))
+    const s6 = reduce(s5, makeInvite({ escrowId: 'cancelled.1' }))
+    const s7 = reduce(s6, makeCancelled({ escrowId: 'cancelled.0', txid: 'txA' }))
+    const s8 = reduce(s7, makeCancelled({ escrowId: 'cancelled.1', txid: 'txB' }))
+
+    const next = removeCancelledEscrows(s8)
+    expect(Object.keys(next.escrows).sort()).toEqual(['active.0', 'spent.0'])
+    expect(next.escrows['active.0'].status).toBe('active')
+    expect(next.escrows['spent.0'].status).toBe('spent')
+  })
+
+  it('returns the same state when nothing is cancelled', () => {
+    const s1 = reduce(emptyState, makeInvite())
+    const next = removeCancelledEscrows(s1)
+    expect(next).toBe(s1)
+  })
+})
+
+describe('removeCancelledAndSave', () => {
+  const OWN_KEY = 'remove_cancelled_key'
+
+  beforeEach(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(`crowd:${OWN_KEY}`)
+    }
+  })
+
+  afterEach(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(`crowd:${OWN_KEY}`)
+    }
+  })
+
+  it('persists the pruned state', () => {
+    const s1 = reduce(emptyState, makeInvite({ escrowId: 'keep.0' }))
+    const s2 = reduce(s1, makeInvite({ escrowId: 'gone.0' }))
+    const s3 = reduce(s2, makeCancelled({ escrowId: 'gone.0', txid: 'tx1' }))
+
+    const next = removeCancelledAndSave(OWN_KEY, s3)
+    expect(Object.keys(next.escrows)).toEqual(['keep.0'])
+    expect(loadState(OWN_KEY)).toEqual(next)
   })
 })
 

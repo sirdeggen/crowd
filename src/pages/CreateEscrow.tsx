@@ -218,11 +218,22 @@ export function CreateEscrow () {
           <span>{satoshisValid ? formatSats(satoshis) : <em style={{ color: 'var(--text-dim)' }}>—</em>}</span>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-          <span style={{ color: 'var(--text-dim)', marginRight: 4 }}>Controllers </span>
-          {ownKey !== '' && <AvatarChip identityKey={ownKey} size={22} showName={false} />}
-          {others.map(o => (
-            <AvatarChip key={o.identityKey} identityKey={o.identityKey} size={22} showName={false} />
-          ))}
+          <span style={{ color: 'var(--text-dim)', marginRight: 4, width: '100%' }}>Controllers</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 0 }}>
+            {ownKey !== '' && (
+              <span style={{ position: 'relative', zIndex: others.length + 1 }}>
+                <AvatarChip identityKey={ownKey} size={26} showName={false} stacked />
+              </span>
+            )}
+            {others.map((o, idx) => (
+              <span
+                key={o.identityKey}
+                style={{ marginLeft: -8, position: 'relative', zIndex: others.length - idx }}
+              >
+                <AvatarChip identityKey={o.identityKey} size={26} showName={false} stacked />
+              </span>
+            ))}
+          </div>
         </div>
         <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>
           Any{' '}
@@ -314,19 +325,8 @@ export function CreateEscrow () {
 
             {/* Self chip — locked, no remove */}
             {ownKey !== '' && (
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  background: 'var(--bg-raise)',
-                  border: '1px solid var(--panel-border)',
-                  borderRadius: 999,
-                  padding: '4px 10px 4px 6px',
-                  marginBottom: 10,
-                }}
-              >
-                <AvatarChip identityKey={ownKey} size={24} showName suffix="(you)" />
+              <div style={{ marginBottom: 12 }}>
+                <AvatarChip identityKey={ownKey} size={30} showName suffix="(you)" showKey />
               </div>
             )}
 

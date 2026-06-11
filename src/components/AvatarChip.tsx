@@ -1,23 +1,29 @@
 import { memo, useEffect, useState } from 'react'
 import { resolveKey, placeholderName } from '../lib/identity'
 import type { DisplayableIdentity } from '../lib/identity'
+import { IdentityAvatar } from './IdentityAvatar'
 
 interface Props {
   identityKey: string
   size?: number
   showName?: boolean
   suffix?: string
+  stacked?: boolean
+  /** Show abbreviated key under the display name */
+  showKey?: boolean
+  /** Render without the outer pill — for use inside another bordered container */
+  embedded?: boolean
 }
 
-function keyHue (key: string): number {
-  let hash = 0
-  for (let i = 0; i < key.length; i++) {
-    hash = (hash * 31 + key.charCodeAt(i)) & 0xffffffff
-  }
-  return Math.abs(hash) % 360
-}
-
-function AvatarChipInner ({ identityKey, size = 32, showName = true, suffix }: Props) {
+function AvatarChipInner ({
+  identityKey,
+  size = 32,
+  showName = true,
+  suffix,
+  stacked = false,
+  showKey = false,
+  embedded = false,
+}: Props) {
   const [loading, setLoading] = useState(true)
   const [identity, setIdentity] = useState<DisplayableIdentity | undefined>(undefined)
 
@@ -36,103 +42,65 @@ function AvatarChipInner ({ identityKey, size = 32, showName = true, suffix }: P
     return () => { cancelled = true }
   }, [identityKey])
 
-  const hue = keyHue(identityKey)
+  const displayName = (identity?.name != null && identity.name !== '')
+    ? identity.name
+    : placeholderName(identityKey)
+  const abbreviatedKey = identity?.abbreviatedKey ?? `${identityKey.slice(0, 6)}…${identityKey.slice(-4)}`
+  const isPlaceholder = identity?.name == null || identity.name === ''
 
-  const circleStyle: React.CSSProperties = {
-    width: size,
-    height: size,
-    borderRadius: '50%',
-    flexShrink: 0,
-    display: 'inline-block',
-  }
-
-  const wrapStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 8,
-    verticalAlign: 'middle',
-  }
-
-  const nameStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    lineHeight: 1.3,
-  }
-
-  const nameTextStyle: React.CSSProperties = {
-    fontSize: 14,
-    fontWeight: 500,
-    color: 'var(--text)',
-  }
-
-  const suffixStyle: React.CSSProperties = {
-    fontSize: 12,
-    color: 'var(--text-dim)',
-    fontStyle: 'italic',
-  }
+  const chipClass = embedded
+    ? 'identity-chip__inner'
+    : `identity-chip${showName ? '' : ' identity-chip--avatar-only'}`
 
   if (loading) {
     return (
-      <span style={wrapStyle}>
+      <span className={chipClass}>
         <span
-          className="shimmer"
-          style={{ ...circleStyle }}
+          className="identity-avatar identity-avatar--loading"
+          style={{ width: size, height: size }}
+          aria-hidden
         />
         {showName && (
-          <span className="shimmer" style={{ width: 72, height: 12, borderRadius: 4, display: 'inline-block' }} />
+          <span className="identity-chip__text">
+            <span className="shimmer identity-chip__name-skeleton" />
+          </span>
         )}
       </span>
     )
   }
 
-  // Resolved name or deterministic placeholder — never show raw key
-  const displayName = (identity?.name != null && identity.name !== '') ? identity.name : placeholderName(identityKey)
-  const avatarURL = identity?.avatarURL
+  const avatar = (
+    <IdentityAvatar
+      identityKey={identityKey}
+      displayName={displayName}
+      avatarURL={identity?.avatarURL}
+      size={size}
+      stacked={stacked}
+      title={`${displayName} · ${abbreviatedKey}`}
+    />
+  )
 
-  let avatar: React.ReactNode
-  if (avatarURL != null && avatarURL !== '') {
-    avatar = (
-      <img
-        src={avatarURL}
-        alt={displayName}
-        style={{ ...circleStyle, objectFit: 'cover' }}
-      />
-    )
-  } else {
-    const initial = displayName[0]?.toUpperCase() ?? '?'
-    avatar = (
-      <span
-        title={identityKey}
-        style={{
-          ...circleStyle,
-          background: `linear-gradient(135deg, hsl(${hue},80%,60%), hsl(${(hue + 60) % 360},80%,50%))`,
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: size * 0.4,
-          fontWeight: 700,
-          color: '#fff',
-          fontFamily: 'var(--font-display)',
-        }}
-      >
-        {initial}
-      </span>
-    )
+  if (!showName) {
+    return avatar
   }
 
   return (
-    <span style={wrapStyle}>
+    <span className={chipClass}>
       {avatar}
-      {showName && (
-        <span style={nameStyle}>
-          <span style={nameTextStyle}>{displayName}</span>
+      <span className="identity-chip__text">
+        <span className="identity-chip__name">
+          {displayName}
           {suffix != null && suffix !== '' && (
-            <span style={suffixStyle}>{suffix}</span>
+            <span className="identity-chip__suffix">{suffix}</span>
           )}
         </span>
-      )}
+        {(showKey || isPlaceholder) && (
+          <span className="identity-chip__key">{abbreviatedKey}</span>
+        )}
+        {identity?.badgeLabel != null && identity.badgeLabel !== '' && (
+          <span className="identity-chip__badge">{identity.badgeLabel}</span>
+        )}
+      </span>
     </span>
   )
 }

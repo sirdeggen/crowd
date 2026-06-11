@@ -22,6 +22,15 @@ function isDirectKey (val: string): boolean {
   return KEY_RE.test(val.trim())
 }
 
+function SearchIcon () {
+  return (
+    <svg className="identity-picker-search-icon" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function IdentityPicker ({ selected, onChange, excludeKeys = [], single = false }: Props) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<DisplayableIdentity[]>([])
@@ -38,18 +47,15 @@ export function IdentityPicker ({ selected, onChange, excludeKeys = [], single =
     ...selected.map(s => s.identityKey),
   ])
 
-  // Reset active index when results change
   useEffect(() => {
     setActiveIndex(-1)
   }, [results])
 
-  // Debounced search
   useEffect(() => {
     if (timerRef.current !== null) clearTimeout(timerRef.current)
 
     const trimmed = query.trim()
 
-    // Direct key entry — skip search
     if (isDirectKey(trimmed)) {
       setResults([])
       setSearching(false)
@@ -88,7 +94,6 @@ export function IdentityPicker ({ selected, onChange, excludeKeys = [], single =
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
 
-  // Close on outside click
   useEffect(() => {
     function handlePointerDown (e: PointerEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -162,12 +167,12 @@ export function IdentityPicker ({ selected, onChange, excludeKeys = [], single =
 
   return (
     <div ref={containerRef} style={{ position: 'relative' }}>
-      {/* Search input */}
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+      <div className="identity-picker-input-wrap">
+        <SearchIcon />
         <input
           ref={inputRef}
           className="input"
-          placeholder="Search identities…"
+          placeholder="Search by name, email, or paste a key…"
           value={query}
           onChange={e => setQuery(e.target.value)}
           onFocus={() => {
@@ -197,41 +202,26 @@ export function IdentityPicker ({ selected, onChange, excludeKeys = [], single =
         )}
       </div>
 
-      {/* Dropdown */}
       {open && (
-        <div
-          className="panel"
-          role="listbox"
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 6px)',
-            left: 0,
-            right: 0,
-            zIndex: 100,
-            padding: 0,
-            overflow: 'hidden',
-            maxHeight: 320,
-            overflowY: 'auto',
-          }}
-        >
+        <div className="panel identity-picker-dropdown" role="listbox">
           {showDirectAdd && (
             <button
               type="button"
               className="ip-row"
               onClick={() => addByKey(trimmedQuery)}
-              style={rowStyle}
             >
-              <AvatarChip identityKey={trimmedQuery} size={28} showName />
+              <AvatarChip identityKey={trimmedQuery} size={32} showName showKey />
               <span style={{ flex: 1, fontSize: 13, color: 'var(--text-dim)' }}>
                 Add by key
               </span>
-              <span style={addBadgeStyle}>Add</span>
+              <span className="ip-row-add">Add</span>
             </button>
           )}
 
           {!showDirectAdd && results.length === 0 && !searching && (
-            <div style={{ padding: '12px 16px', color: 'var(--text-dim)', fontSize: 13 }}>
-              No matches — paste an identity key below
+            <div className="identity-picker-empty">
+              No matches found.<br />
+              Paste a full identity key to add directly.
             </div>
           )}
 
@@ -243,47 +233,24 @@ export function IdentityPicker ({ selected, onChange, excludeKeys = [], single =
               aria-selected={idx === activeIndex}
               className={`ip-row${idx === activeIndex ? ' ip-row-active' : ''}`}
               onClick={() => addIdentity(id)}
-              style={rowStyle}
             >
-              <AvatarChip identityKey={id.identityKey} size={28} showName />
-              <span style={addBadgeStyle}>Add</span>
+              <AvatarChip identityKey={id.identityKey} size={32} showName />
+              <span className="ip-row-add">Add</span>
             </button>
           ))}
         </div>
       )}
 
-      {/* Selected chips (when not single mode) */}
       {!single && selected.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
           {selected.map(s => (
-            <span
-              key={s.identityKey}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                background: 'var(--bg-raise)',
-                border: '1px solid var(--panel-border)',
-                borderRadius: 999,
-                padding: '4px 8px 4px 6px',
-              }}
-            >
-              <AvatarChip identityKey={s.identityKey} size={24} showName />
+            <span key={s.identityKey} className="identity-chip identity-chip--actionable">
+              <AvatarChip identityKey={s.identityKey} size={26} showName embedded />
               <button
                 type="button"
+                className="identity-chip__remove"
                 onClick={() => removeIdentity(s.identityKey)}
                 aria-label={`Remove ${s.name || s.identityKey}`}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-dim)',
-                  cursor: 'pointer',
-                  padding: '0 2px',
-                  fontSize: 14,
-                  lineHeight: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
               >
                 ×
               </button>
@@ -293,30 +260,4 @@ export function IdentityPicker ({ selected, onChange, excludeKeys = [], single =
       )}
     </div>
   )
-}
-
-const rowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-  width: '100%',
-  padding: '10px 16px',
-  background: 'none',
-  border: 'none',
-  borderBottom: '1px solid var(--panel-border)',
-  cursor: 'pointer',
-  textAlign: 'left',
-  color: 'var(--text)',
-}
-
-const addBadgeStyle: React.CSSProperties = {
-  marginLeft: 'auto',
-  fontSize: 11,
-  fontWeight: 600,
-  color: 'var(--accent)',
-  background: 'rgba(56,224,255,0.1)',
-  border: '1px solid rgba(56,224,255,0.25)',
-  borderRadius: 6,
-  padding: '2px 8px',
-  flexShrink: 0,
 }
