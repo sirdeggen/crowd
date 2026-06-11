@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  PrivateKey, PublicKey, Transaction, LockingScript, UnlockingScript,
+  PrivateKey, Transaction, LockingScript, UnlockingScript,
   BigNumber, ECDSA, TransactionSignature, Spend, P2PKH
 } from '@bsv/sdk'
 import { CrowdEscrow, SIGHASH_SCOPE } from './CrowdEscrow'
