@@ -77,6 +77,16 @@ export function Dashboard () {
           {ownKey !== '' && (
             <AvatarChip identityKey={ownKey} size={30} showName suffix="(you)" />
           )}
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('crowd:open-tour'))}
+            className="btn btn-ghost"
+            aria-label="Show guide"
+            title="Show guide"
+            style={{ minHeight: 36, width: 36, padding: 0, fontSize: 16, fontWeight: 700 }}
+          >
+            ?
+          </button>
           {escrows.length > 0 && (
             <Link to="/new" className="btn fab-hide-mobile">
               + New escrow

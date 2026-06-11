@@ -3,6 +3,7 @@ import { WalletGate } from './components/WalletGate'
 import { Dashboard } from './pages/Dashboard'
 import { CreateEscrow } from './pages/CreateEscrow'
 import { EscrowDetail } from './pages/EscrowDetail'
+import { OnboardingTour } from './components/OnboardingTour'
 
 function App () {
   return (
@@ -13,6 +14,7 @@ function App () {
         <Route path="/e/:escrowId" element={<EscrowDetail />} />
         <Route path="/e/:escrowId/p/:proposalId" element={<EscrowDetail />} />
       </Routes>
+      <OnboardingTour />
     </WalletGate>
   )
 }
