@@ -24,7 +24,7 @@ function EscrowGrid ({ entries, featured = false }: { entries: EscrowEntry[], fe
 }
 
 export function Dashboard () {
-  const { state, ownKey, removeCancelledEscrows } = useCrowd()
+  const { state, ownKey, clearEscrows } = useCrowd()
   const escrows = Object.entries(state.escrows)
 
   const { active, spent, cancelled } = useMemo(() => {
@@ -46,16 +46,17 @@ export function Dashboard () {
     }
   }, [escrows])
 
-  const [clearArmed, setClearArmed] = useState(false)
+  // Two-tap confirm, armed per section
+  const [clearArmed, setClearArmed] = useState<'cancelled' | 'spent' | null>(null)
   const clearResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  function handleRemoveCancelled () {
-    if (cancelled.length === 0) return
+  function handleClear (status: 'cancelled' | 'spent', count: number) {
+    if (count === 0) return
 
-    if (!clearArmed) {
-      setClearArmed(true)
+    if (clearArmed !== status) {
+      setClearArmed(status)
       if (clearResetRef.current != null) clearTimeout(clearResetRef.current)
-      clearResetRef.current = setTimeout(() => setClearArmed(false), 3000)
+      clearResetRef.current = setTimeout(() => setClearArmed(null), 3000)
       return
     }
 
@@ -63,8 +64,8 @@ export function Dashboard () {
       clearTimeout(clearResetRef.current)
       clearResetRef.current = null
     }
-    setClearArmed(false)
-    removeCancelledEscrows()
+    setClearArmed(null)
+    clearEscrows(status)
   }
 
   return (
@@ -146,6 +147,18 @@ export function Dashboard () {
                   <h2 className="dashboard-section__title">Completed</h2>
                   <p className="dashboard-section__desc">Funds released via an approved proposal.</p>
                 </div>
+                <div className="dashboard-section__actions">
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => handleClear('spent', spent.length)}
+                    style={{ minHeight: 34, padding: '0 12px', fontSize: 12 }}
+                  >
+                    {clearArmed === 'spent'
+                      ? `Confirm (${spent.length})`
+                      : 'Clear all'}
+                  </button>
+                </div>
               </div>
               <EscrowGrid entries={spent} />
             </section>
@@ -162,10 +175,10 @@ export function Dashboard () {
                   <button
                     type="button"
                     className="btn btn-ghost btn-danger"
-                    onClick={handleRemoveCancelled}
+                    onClick={() => handleClear('cancelled', cancelled.length)}
                     style={{ minHeight: 34, padding: '0 12px', fontSize: 12 }}
                   >
-                    {clearArmed
+                    {clearArmed === 'cancelled'
                       ? `Confirm (${cancelled.length})`
                       : 'Remove all'}
                   </button>

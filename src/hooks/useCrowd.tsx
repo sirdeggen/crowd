@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { applyMessages, emptyState, removeCancelledEscrows, type CrowdState } from '../lib/store'
+import { applyMessages, emptyState, removeEscrowsByStatus, type CrowdState } from '../lib/store'
 import { type CrowdMessage } from '../lib/protocol'
 import { getOwnIdentityKey } from '../lib/wallet'
 import { readInbox, ackMessages, listenLive, type InboxItem } from '../lib/messages'
@@ -18,7 +18,7 @@ interface CrowdContextValue {
   state: CrowdState
   mbxError?: string
   dispatchMessages: (msgs: CrowdMessage[]) => void
-  removeCancelledEscrows: () => void
+  clearEscrows: (status: 'cancelled' | 'spent') => void
   refresh: () => Promise<void>
 }
 
@@ -136,17 +136,17 @@ export function CrowdProvider ({ children }: { children: ReactNode }) {
     setState(s => applyMessages(s, msgs))
   }, [])
 
-  // Clear cancelled escrows: garbage-collect their messages from the relay,
-  // then drop them from state.
-  const removeCancelledEscrowsFn = useCallback(() => {
+  // Clear escrows in a terminal state: garbage-collect their messages from
+  // the relay (acknowledge = delete), then drop them from state.
+  const clearEscrows = useCallback((status: 'cancelled' | 'spent') => {
     setState(s => {
-      const cancelledIds = Object.entries(s.escrows)
-        .filter(([, es]) => es.status === 'cancelled')
+      const targetIds = Object.entries(s.escrows)
+        .filter(([, es]) => es.status === status)
         .map(([id]) => id)
-      const messageIds = cancelledIds.flatMap(id => messageIdsRef.current.get(id) ?? [])
+      const messageIds = targetIds.flatMap(id => messageIdsRef.current.get(id) ?? [])
       ackMessages(messageIds).catch(() => {})
-      for (const id of cancelledIds) messageIdsRef.current.delete(id)
-      return removeCancelledEscrows(s)
+      for (const id of targetIds) messageIdsRef.current.delete(id)
+      return removeEscrowsByStatus(s, status)
     })
   }, [])
 
@@ -165,7 +165,7 @@ export function CrowdProvider ({ children }: { children: ReactNode }) {
     state,
     mbxError,
     dispatchMessages,
-    removeCancelledEscrows: removeCancelledEscrowsFn,
+    clearEscrows,
     refresh,
   }
 

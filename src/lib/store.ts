@@ -231,10 +231,10 @@ export function applyMessages (s: CrowdState, msgs: CrowdMessage[]): CrowdState 
   return { escrows: state.escrows, pending }
 }
 
-/** Pure: remove all escrows with status `cancelled` from state. */
-export function removeCancelledEscrows (state: CrowdState): CrowdState {
+/** Pure: remove all escrows with the given terminal status from state. */
+export function removeEscrowsByStatus (state: CrowdState, status: 'cancelled' | 'spent'): CrowdState {
   const escrows = Object.fromEntries(
-    Object.entries(state.escrows).filter(([, es]) => es.status !== 'cancelled'),
+    Object.entries(state.escrows).filter(([, es]) => es.status !== status),
   )
   if (Object.keys(escrows).length === Object.keys(state.escrows).length) return state
   return { ...state, escrows }
