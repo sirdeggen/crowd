@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { useCrowd } from '../hooks/useCrowd'
 import { buildProposal, signProposal } from '../lib/escrow'
 import { fanOut } from '../lib/messages'
-import type { InviteMsg, SignatureMsg } from '../lib/protocol'
+import type { CrowdMessage, InviteMsg, SignatureMsg } from '../lib/protocol'
 import type { DisplayableIdentity } from '../lib/identity'
 import { AvatarChip } from './AvatarChip'
 import { IdentityPicker } from './IdentityPicker'
@@ -27,6 +27,10 @@ export function ProposeForm ({ invite, defaultOpen = false }: Props) {
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Recipients whose proposal/signature delivery failed, plus the messages to
+  // resend — without this, a relay hiccup silently leaves counterparties
+  // unable to see the proposal at all.
+  const [sendFailures, setSendFailures] = useState<{ recipients: string[], msgs: CrowdMessage[] } | null>(null)
 
   // Recipient gets the full escrow; the broadcasting wallet covers the fee
   const sendSats = invite.satoshis
@@ -57,8 +61,10 @@ export function ProposeForm ({ invite, defaultOpen = false }: Props) {
         signer: ownKey,
         sigHex,
       }
-      await fanOut(proposal, invite.controllers, ownKey)
-      await fanOut(sigMsg, invite.controllers, ownKey)
+      const failedProposal = await fanOut(proposal, invite.controllers, ownKey)
+      const failedSig = await fanOut(sigMsg, invite.controllers, ownKey)
+      const failed = [...new Set([...failedProposal, ...failedSig])]
+      setSendFailures(failed.length > 0 ? { recipients: failed, msgs: [proposal, sigMsg] } : null)
       dispatchMessages([proposal, sigMsg])
       // Reset form
       setOpen(false)
@@ -71,6 +77,22 @@ export function ProposeForm ({ invite, defaultOpen = false }: Props) {
       setBusy(false)
     }
   }, [canSubmit, invite, note, recipientIdentityKey, recipientAddress, ownKey, dispatchMessages])
+
+  const handleRetrySend = useCallback(async () => {
+    if (sendFailures == null || busy) return
+    setBusy(true)
+    try {
+      const stillFailed = new Set<string>()
+      for (const msg of sendFailures.msgs) {
+        for (const r of await fanOut(msg, sendFailures.recipients, ownKey)) stillFailed.add(r)
+      }
+      setSendFailures(stillFailed.size > 0
+        ? { recipients: [...stillFailed], msgs: sendFailures.msgs }
+        : null)
+    } finally {
+      setBusy(false)
+    }
+  }, [sendFailures, busy, ownKey])
 
   return (
     <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
@@ -99,6 +121,30 @@ export function ProposeForm ({ invite, defaultOpen = false }: Props) {
           {open ? '−' : '+'}
         </span>
       </button>
+
+      {/* Delivery-failure banner: shown even when the form is collapsed,
+          since submit collapses the form before delivery is confirmed */}
+      {sendFailures != null && (
+        <div style={{ margin: '0 20px 16px', background: 'rgba(255,92,122,0.06)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)', padding: '12px 14px', fontSize: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ color: 'var(--danger)', flex: 1, minWidth: 180 }}>
+            The proposal didn&apos;t reach {sendFailures.recipients.length === 1 ? 'one controller' : `${sendFailures.recipients.length} controllers`} — they won&apos;t see it until it&apos;s resent.
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {sendFailures.recipients.slice(0, 4).map(r => (
+              <AvatarChip key={r} identityKey={r} size={22} showName={false} />
+            ))}
+          </div>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{ minHeight: 36, padding: '0 14px', fontSize: 13 }}
+            onClick={() => { void handleRetrySend() }}
+            disabled={busy}
+          >
+            {busy ? 'Resending…' : 'Resend'}
+          </button>
+        </div>
+      )}
 
       {open && (
         <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>

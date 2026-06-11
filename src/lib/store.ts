@@ -13,9 +13,18 @@ export interface EscrowState {
   spentTxid?: string
   proposals: Record<string, ProposalState>
 }
-export interface CrowdState { escrows: Record<string, EscrowState> }
+export interface CrowdState {
+  escrows: Record<string, EscrowState>
+  /** Orphan messages (e.g. a proposal whose invite hasn't arrived yet — the
+   * relay deletes acknowledged messages, so they must be retained locally
+   * until their parent shows up). */
+  pending: CrowdMessage[]
+}
 
-export const emptyState: CrowdState = Object.freeze({ escrows: Object.freeze({}) }) as CrowdState
+export const emptyState: CrowdState = Object.freeze({
+  escrows: Object.freeze({}),
+  pending: Object.freeze([] as CrowdMessage[]),
+}) as CrowdState
 
 export function reduce (state: CrowdState, msg: CrowdMessage): CrowdState {
   switch (msg.type) {
@@ -161,13 +170,15 @@ export function reduce (state: CrowdState, msg: CrowdMessage): CrowdState {
 }
 
 const STORAGE_PREFIX = 'crowd:'
+const MAX_PENDING = 200
 
 export function loadState (ownKey: string): CrowdState {
   if (typeof localStorage === 'undefined') return emptyState
   try {
     const raw = localStorage.getItem(`${STORAGE_PREFIX}${ownKey}`)
     if (raw === null) return emptyState
-    return JSON.parse(raw) as CrowdState
+    const parsed = JSON.parse(raw) as Partial<CrowdState>
+    return { escrows: parsed.escrows ?? {}, pending: parsed.pending ?? [] }
   } catch {
     return emptyState
   }
@@ -178,8 +189,62 @@ export function saveState (ownKey: string, s: CrowdState): void {
   localStorage.setItem(`${STORAGE_PREFIX}${ownKey}`, JSON.stringify(s))
 }
 
+/** True when the message can't apply yet because its parent (escrow or
+ * proposal) is unknown — worth retaining. False for messages that are
+ * invalid, duplicate, or already applied against current state. */
+function isOrphan (state: CrowdState, msg: CrowdMessage): boolean {
+  switch (msg.type) {
+    case 'invite':
+      return false
+    case 'proposal':
+    case 'cancelled':
+      return state.escrows[msg.escrowId] === undefined
+    case 'signature':
+    case 'veto':
+    case 'finalized': {
+      const escrow = state.escrows[msg.escrowId]
+      if (escrow === undefined) return true
+      return escrow.proposals[msg.proposalId] === undefined
+    }
+  }
+}
+
+/**
+ * Fold messages into state, retrying until a fixed point so out-of-order
+ * delivery (signature before proposal before invite) still converges.
+ * Messages that still can't apply but reference an unknown parent are kept
+ * in `state.pending` (deduped, capped) for future batches.
+ */
 export function applyAndSave (ownKey: string, s: CrowdState, msgs: CrowdMessage[]): CrowdState {
-  const next = msgs.reduce(reduce, s)
+  let queue: CrowdMessage[] = [...s.pending, ...msgs]
+  let state: CrowdState = { escrows: s.escrows, pending: [] }
+
+  let progress = true
+  while (progress) {
+    progress = false
+    const remaining: CrowdMessage[] = []
+    for (const m of queue) {
+      const next = reduce(state, m)
+      if (next !== state) {
+        state = next
+        progress = true
+      } else if (isOrphan(state, m)) {
+        remaining.push(m)
+      }
+      // else: duplicate or invalid — drop permanently
+    }
+    queue = remaining
+  }
+
+  const seen = new Set<string>()
+  const pending = queue.filter(m => {
+    const key = JSON.stringify(m)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  }).slice(-MAX_PENDING)
+
+  const next: CrowdState = { escrows: state.escrows, pending }
   saveState(ownKey, next)
   return next
 }

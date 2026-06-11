@@ -454,3 +454,56 @@ describe('isCrowdMessage', () => {
     expect(isCrowdMessage({ type: 'cancelled' })).toBe(true)
   })
 })
+
+describe('orphan buffering (out-of-order delivery)', () => {
+  const OWN_KEY = 'orphan_test_key'
+
+  it('applies a full batch delivered in reverse order (signature, proposal, invite)', () => {
+    const result = applyAndSave(OWN_KEY, emptyState, [
+      makeSig(CONTROLLERS[0]),
+      makeProposal(),
+      makeInvite(),
+    ])
+    const es = result.escrows['deadbeef.0']
+    expect(es).toBeDefined()
+    const ps = es.proposals['prop001']
+    expect(ps).toBeDefined()
+    expect(ps.signatures[CONTROLLERS[0]]).toBeDefined()
+    expect(result.pending).toEqual([])
+  })
+
+  it('holds orphans in pending across batches and applies them when the parent arrives', () => {
+    const s1 = applyAndSave(OWN_KEY, emptyState, [makeProposal(), makeSig(CONTROLLERS[1])])
+    expect(Object.keys(s1.escrows)).toHaveLength(0)
+    expect(s1.pending).toHaveLength(2)
+
+    const s2 = applyAndSave(OWN_KEY, s1, [makeInvite()])
+    const ps = s2.escrows['deadbeef.0'].proposals['prop001']
+    expect(ps).toBeDefined()
+    expect(ps.signatures[CONTROLLERS[1]]).toBeDefined()
+    expect(s2.pending).toEqual([])
+  })
+
+  it('does not buffer invalid messages (signature from a non-controller)', () => {
+    const result = applyAndSave(OWN_KEY, emptyState, [
+      makeInvite(),
+      makeProposal(),
+      makeSig('not-a-controller'),
+    ])
+    expect(result.pending).toEqual([])
+    expect(result.escrows['deadbeef.0'].proposals['prop001'].signatures['not-a-controller']).toBeUndefined()
+  })
+
+  it('dedupes identical orphans across batches', () => {
+    const s1 = applyAndSave(OWN_KEY, emptyState, [makeProposal()])
+    const s2 = applyAndSave(OWN_KEY, s1, [makeProposal()])
+    expect(s2.pending).toHaveLength(1)
+  })
+
+  it('persists pending to localStorage and reloads it', () => {
+    const s1 = applyAndSave(OWN_KEY, emptyState, [makeProposal()])
+    expect(s1.pending).toHaveLength(1)
+    const loaded = loadState(OWN_KEY)
+    expect(loaded.pending).toHaveLength(1)
+  })
+})
