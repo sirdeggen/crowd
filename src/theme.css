@@ -1,0 +1,9 @@
+:root {
+  --bg: #060A14; --bg-raise: #0B1222; --panel: rgba(148, 184, 255, 0.06);
+  --panel-border: rgba(148, 184, 255, 0.14); --text: #E8EEFB; --text-dim: #8C9AB8;
+  --accent: #38E0FF; --accent-2: #8B5CF6; --danger: #FF5C7A; --ok: #3DF0A8;
+  --grad: linear-gradient(135deg, var(--accent), var(--accent-2));
+  --radius: 16px; --radius-sm: 10px;
+  --font-display: 'Space Grotesk', sans-serif; --font-body: 'Inter', sans-serif;
+  --shadow-glow: 0 0 24px rgba(56, 224, 255, 0.18);
+}
