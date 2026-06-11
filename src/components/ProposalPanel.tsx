@@ -138,7 +138,9 @@ export function ProposalPanel ({ invite, es, ps, highlighted = false }: Props) {
       dispatchMessages([msg])
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
-      autoFinalizeGuard.current = false
+      // Guard stays set: auto-finalize is attempted once; on failure the
+      // manual "Finalize & broadcast" button remains as the retry path,
+      // avoiding a broadcast retry loop on every re-render.
     } finally {
       busyRef.current = false
       setBusy(false)

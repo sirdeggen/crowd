@@ -41,8 +41,10 @@ export function CreateEscrow () {
   const satoshis = parseInt(satoshisInput, 10)
   const satoshisValid = Number.isFinite(satoshis) && satoshis >= DUST_FLOOR
   const nameValid = name.trim().length > 0
-  const controllersValid = others.length >= 1
+  // CrowdEscrow.lock supports at most 10 pubkeys (self + 9 others)
+  const controllersValid = others.length >= 1 && M <= 10
   const canSubmit = nameValid && satoshisValid && controllersValid && !busy
+  const tooManyControllers = M > 10
 
   const showDustHint = satoshisInput !== '' && !satoshisValid
 
@@ -323,8 +325,10 @@ export function CreateEscrow () {
             />
 
             {!controllersValid && (
-              <p style={{ ...hintStyle, color: 'var(--text-dim)' }}>
-                Add at least one other controller
+              <p style={{ ...hintStyle, color: tooManyControllers ? 'var(--danger)' : 'var(--text-dim)' }}>
+                {tooManyControllers
+                  ? 'A maximum of 10 controllers (including you) is supported'
+                  : 'Add at least one other controller'}
               </p>
             )}
           </div>

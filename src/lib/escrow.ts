@@ -174,19 +174,22 @@ export async function createEscrow (p: CreateEscrowParams): Promise<InviteMsg> {
     options: { randomizeOutputs: false },
   })
 
-  // Derive txid and beef
-  let txid: string
-  let beef: string
-  if (result.txid !== undefined) {
-    txid = result.txid
-    beef = Utils.toHex(result.tx!)
-  } else {
-    const parsedTx = Transaction.fromAtomicBEEF(result.tx!)
-    txid = parsedTx.id('hex')
-    beef = Utils.toHex(result.tx!)
+  if (result.tx == null) {
+    throw new Error('Wallet did not return the transaction BEEF for the escrow')
+  }
+  const fundingTx = Transaction.fromAtomicBEEF(result.tx)
+  const txid = result.txid ?? fundingTx.id('hex')
+  const beef = Utils.toHex(result.tx)
+
+  // Don't assume the escrow landed at vout 0 — find the output whose locking
+  // script matches, in case the wallet reorders outputs despite randomizeOutputs.
+  const lockHex = lock.toHex()
+  const vout = fundingTx.outputs.findIndex(o => o.lockingScript.toHex() === lockHex)
+  if (vout === -1) {
+    throw new Error('Escrow output not found in the wallet-built transaction')
   }
 
-  const escrowId = `${txid}.0`
+  const escrowId = `${txid}.${vout}`
 
   return {
     type: 'invite',

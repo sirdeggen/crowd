@@ -50,9 +50,9 @@ Clients load state on startup via `listMessages({ messageBox: 'crowd' })` and st
 
 ### Share links
 
-Invite link: `/#/e/<escrowId>?d=<base64url(invite payload)>` — anyone with the link and a wallet can view the escrow; only listed controllers can sign.
+Invite link: `/#/e/<escrowId>?d=<base64url(invite payload)>` — anyone with the link and a wallet can view the escrow; only listed controllers can sign. The payload embeds the funding transaction's BEEF, so links for transactions with deep unconfirmed ancestry can grow to several KB and may exceed URL limits in some contexts (messengers, QR codes); controllers always also receive the invite via MessageBox, so the link is a convenience, not the only channel.
 
-Proposal link: `/#/p/<escrowId>/<proposalId>` — data is resolved from the holder's inbox or local store.
+Proposal link: `/#/e/<escrowId>/p/<proposalId>` — data is resolved from the holder's inbox or local store.
 
 ---
 
