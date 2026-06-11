@@ -118,7 +118,7 @@ export function ProposeForm ({ invite }: Props) {
             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
               <button
                 type="button"
-                className={`btn btn-ghost${mode === 'identity' ? '' : ''}`}
+                className="btn btn-ghost"
                 onClick={() => setMode('identity')}
                 style={{
                   minHeight: 36,

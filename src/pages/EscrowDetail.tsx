@@ -36,6 +36,8 @@ export function EscrowDetail () {
   const cancelResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [cancelBusy, setCancelBusy] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
+  // Synchronous guard — a double-click reads stale cancelBusy state
+  const cancelBusyRef = useRef(false)
 
   const escrow = state.escrows[escrowId]
 
@@ -62,6 +64,8 @@ export function EscrowDetail () {
       return
     }
     // Second tap
+    if (cancelBusyRef.current) return
+    cancelBusyRef.current = true
     if (cancelResetRef.current != null) {
       clearTimeout(cancelResetRef.current)
       cancelResetRef.current = null
@@ -77,6 +81,7 @@ export function EscrowDetail () {
     } catch (e) {
       setCancelError(e instanceof Error ? e.message : String(e))
     } finally {
+      cancelBusyRef.current = false
       setCancelBusy(false)
     }
   }

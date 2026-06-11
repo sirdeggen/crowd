@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useCrowd } from '../hooks/useCrowd'
-import { signProposal, verifySignature, readyToFinalize, finalizeProposal } from '../lib/escrow'
+import { signProposal, verifySignature, finalizeProposal } from '../lib/escrow'
 import { fanOut } from '../lib/messages'
 import type { EscrowState, ProposalState } from '../lib/store'
 import type { InviteMsg, SignatureMsg, VetoMsg, FinalizedMsg } from '../lib/protocol'
@@ -29,6 +29,9 @@ export function ProposalPanel ({ invite, es, ps, highlighted = false }: Props) {
   const [busy, setBusy] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const autoFinalizeGuard = useRef(false)
+  // Synchronous re-entrancy guard: React state alone can't stop a double-click
+  // or the auto-finalize effect racing a manual action.
+  const busyRef = useRef(false)
 
   const { proposal } = ps
   const escrowId = invite.escrowId
@@ -44,16 +47,22 @@ export function ProposalPanel ({ invite, es, ps, highlighted = false }: Props) {
     }
   }, [highlighted])
 
-  // Count verified sigs
-  const verifiedCount = useMemo(() => {
-    let count = 0
+  // Verify each signature once per signatures change — sighash computation is
+  // expensive, so both the ring count and the status rows read this map.
+  const verifiedMap = useMemo(() => {
+    const map: Record<string, boolean> = {}
     for (const [signer, sigHex] of Object.entries(ps.signatures)) {
-      if (verifySignature(invite, proposal, signer, sigHex)) count++
+      map[signer] = verifySignature(invite, proposal, signer, sigHex)
     }
-    return count
+    return map
   }, [ps.signatures, invite, proposal])
 
-  const ready = readyToFinalize(invite, es, proposalId)
+  const verifiedCount = useMemo(
+    () => Object.values(verifiedMap).filter(Boolean).length,
+    [verifiedMap],
+  )
+
+  const ready = verifiedCount >= invite.threshold
   const hasMySig = ownKey in ps.signatures
   const hasMyVeto = ownKey in ps.vetoes
 
@@ -61,6 +70,7 @@ export function ProposalPanel ({ invite, es, ps, highlighted = false }: Props) {
   useEffect(() => {
     if (
       !autoFinalizeGuard.current &&
+      !busyRef.current &&
       isOpen &&
       isActive &&
       isController &&
@@ -71,9 +81,11 @@ export function ProposalPanel ({ invite, es, ps, highlighted = false }: Props) {
       void handleFinalize()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, isOpen, isActive])
+  }, [ready, isOpen, isActive, isController, ownKey, proposal.proposer])
 
   async function handleSign () {
+    if (busyRef.current) return
+    busyRef.current = true
     setBusy(true)
     setError(null)
     try {
@@ -90,12 +102,16 @@ export function ProposalPanel ({ invite, es, ps, highlighted = false }: Props) {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }
 
   async function handleVeto () {
+    if (busyRef.current) return
     const reason = window.prompt('Reason for vetoing (optional):') ?? ''
+    if (busyRef.current) return
+    busyRef.current = true
     setBusy(true)
     setError(null)
     try {
@@ -105,11 +121,14 @@ export function ProposalPanel ({ invite, es, ps, highlighted = false }: Props) {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }
 
   async function handleFinalize () {
+    if (busyRef.current) return
+    busyRef.current = true
     setBusy(true)
     setError(null)
     try {
@@ -121,6 +140,7 @@ export function ProposalPanel ({ invite, es, ps, highlighted = false }: Props) {
       setError(e instanceof Error ? e.message : String(e))
       autoFinalizeGuard.current = false
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }
@@ -154,8 +174,7 @@ export function ProposalPanel ({ invite, es, ps, highlighted = false }: Props) {
       {/* Controller status rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
         {invite.controllers.map(ctrl => {
-          const sigHex = ps.signatures[ctrl]
-          const verified = sigHex != null && verifySignature(invite, proposal, ctrl, sigHex)
+          const verified = verifiedMap[ctrl] === true
           const vetoReason = ps.vetoes[ctrl]
 
           let statusNode: React.ReactNode
